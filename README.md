@@ -75,10 +75,6 @@ Everything needed is in [`powerbi/`](powerbi/): the data (`data/*.csv`, refreshe
 [`build_guide.md`](powerbi/build_guide.md) (step-by-step build) and a colour
 [`theme.json`](powerbi/theme.json).
 
-> **Screenshot placeholder:** after building the report, save page 1 as
-> `powerbi/screenshots/executive_summary.png` and replace this note with
-> `![Power BI executive summary](powerbi/screenshots/executive_summary.png)`.
-
 ## Mistakes this analysis avoids
 
 **Peeking.** Checking results every day and stopping at the first "significant" result turns a 5%
