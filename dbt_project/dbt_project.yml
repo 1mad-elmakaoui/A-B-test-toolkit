@@ -1,0 +1,16 @@
+name: ab_test
+version: "1.0.0"
+config-version: 2
+profile: ab_test
+
+model-paths: ["models"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages"]
+
+models:
+  ab_test:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table

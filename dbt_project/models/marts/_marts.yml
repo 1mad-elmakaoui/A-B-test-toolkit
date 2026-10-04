@@ -1,0 +1,81 @@
+version: 2
+
+models:
+  - name: dim_variant
+    description: Experiment arms.
+    columns:
+      - name: variant_key
+        data_tests: [unique, not_null]
+      - name: variant_name
+        data_tests:
+          - unique
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["control", "treatment"]
+
+  - name: dim_device
+    description: Device the user was on when assigned.
+    columns:
+      - name: device_key
+        data_tests: [unique, not_null]
+      - name: device_name
+        data_tests: [unique, not_null]
+
+  - name: dim_date
+    description: Calendar of experiment days.
+    columns:
+      - name: date_key
+        data_tests: [unique, not_null]
+      - name: date
+        data_tests: [unique, not_null]
+
+  - name: fct_user_outcomes
+    description: One row per user with their test outcome.
+    columns:
+      - name: user_id
+        data_tests: [unique, not_null]
+      - name: variant_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_variant')
+                field: variant_key
+      - name: device_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_device')
+                field: device_key
+      - name: assignment_date_key
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_date')
+                field: date_key
+      - name: converted
+        data_tests: [not_null]
+      - name: revenue
+        data_tests: [not_null]
+
+  - name: fct_experiment_results
+    description: Users, conversion rate and revenue per user for each variant.
+    columns:
+      - name: variant_key
+        data_tests:
+          - unique
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_variant')
+                field: variant_key
+      - name: variant_name
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: ["control", "treatment"]
+      - name: users
+        data_tests: [not_null]

@@ -1,0 +1,8 @@
+# Paths are relative to dbt_project/, which is where the Makefile runs dbt from.
+ab_test:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: ../data/warehouse.duckdb
+      threads: 4

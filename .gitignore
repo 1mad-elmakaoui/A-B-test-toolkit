@@ -1,0 +1,10 @@
+__pycache__/
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+data/warehouse.duckdb
+data/warehouse.duckdb.wal
+dbt_project/target/
+dbt_project/logs/
+logs/
+.user.yml

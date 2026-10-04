@@ -1,0 +1,3 @@
+variant_key,variant_name,users,conversions,revenue,conversion_rate,revenue_per_user,share_of_users
+1,control,24971,2470,187771.17,0.09891474109967563,7.519569500620721,0.49942
+2,treatment,25029,2758,204089.85,0.11019217707459347,8.15413520316433,0.50058

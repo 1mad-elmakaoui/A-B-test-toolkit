@@ -1,0 +1,11 @@
+version: 2
+
+sources:
+  - name: raw
+    description: Raw experiment export written by src/simulate.py.
+    tables:
+      - name: checkout_experiment
+        description: One row per user enrolled in the checkout test.
+        config:
+          meta:
+            external_location: "../data/raw/checkout_experiment.csv"

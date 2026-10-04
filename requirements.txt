@@ -1,0 +1,15 @@
+duckdb>=1.1
+dbt-core>=1.10,<2
+dbt-duckdb>=1.9,<2
+pandas>=2.2
+numpy>=1.26
+scipy>=1.13
+statsmodels>=0.14.2
+matplotlib>=3.8
+altair>=5
+streamlit>=1.50
+jupyter>=1.0
+nbconvert>=7
+nbformat>=5
+ipykernel>=6
+pytest>=8

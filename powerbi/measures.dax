@@ -1,0 +1,165 @@
+// =============================================================================
+// DAX measures for the checkout A/B test report
+// -----------------------------------------------------------------------------
+// Create an empty table called _Measures (Home > Enter data > Load) and add each
+// measure below to it with Modeling > New measure. Paste everything after the
+// comment block, starting at the measure name.
+//
+// Tables come from powerbi/data/*.csv (see model.md for relationships).
+// fct_test_results has no relationships: it holds the statistical results
+// computed in Python, so it is read directly and ignores slicers.
+// =============================================================================
+
+
+// ---------------------------------------------------------------- base counts
+
+// Users: users enrolled in the test within the current filter context
+// (variant, device, date). Format: whole number, thousands separator.
+Users =
+COUNTROWS ( fct_user_outcomes )
+
+// Conversions: users who placed an order. converted is 0/1, so SUM counts orders.
+Conversions =
+SUM ( fct_user_outcomes[converted] )
+
+// Conversion Rate: the primary metric. Share of users who placed an order.
+// Format: Percentage, 2 decimals.
+Conversion Rate =
+DIVIDE ( [Conversions], [Users] )
+
+// Revenue: total revenue from all users in context (non-buyers contribute 0).
+Revenue =
+SUM ( fct_user_outcomes[revenue] )
+
+// Revenue per User: the secondary metric. Averages over every user, not only buyers,
+// so it moves with both conversion and order size. Format: Currency, 2 decimals.
+Revenue per User =
+DIVIDE ( [Revenue], [Users] )
+
+
+// ------------------------------------------------------------ variant splits
+
+// Control Conversion Rate: conversion rate for the current checkout. CALCULATE
+// overrides any variant filter but keeps device and date filters, so it works in
+// the by-device table.
+Control Conversion Rate =
+CALCULATE ( [Conversion Rate], dim_variant[variant_name] = "control" )
+
+// Treatment Conversion Rate: conversion rate for the redesigned checkout.
+Treatment Conversion Rate =
+CALCULATE ( [Conversion Rate], dim_variant[variant_name] = "treatment" )
+
+// Absolute Lift: treatment minus control conversion rate, in percentage points.
+// Blank when either arm has no users in context. Format: Percentage, 2 decimals.
+Absolute Lift =
+VAR _control = [Control Conversion Rate]
+VAR _treatment = [Treatment Conversion Rate]
+RETURN
+    IF ( NOT ISBLANK ( _control ) && NOT ISBLANK ( _treatment ), _treatment - _control )
+
+// Relative Lift: absolute lift as a share of the control rate, the number
+// stakeholders quote ("+11% conversion"). Format: Percentage, 1 decimal.
+Relative Lift =
+DIVIDE ( [Absolute Lift], [Control Conversion Rate] )
+
+// Control Share of Users: share of users assigned to control. Should be close to
+// 50%; the SRM Status measure says whether the gap is a problem. Format: Percentage, 2 decimals.
+Control Share of Users =
+DIVIDE (
+    CALCULATE ( [Users], dim_variant[variant_name] = "control" ),
+    CALCULATE ( [Users], REMOVEFILTERS ( dim_variant ) )
+)
+
+
+// ----------------------------------------------------------------- over time
+
+// Daily Cumulative Conversion by Variant: conversion rate of all users assigned
+// from the first experiment day up to and including the day on the axis. Put
+// dim_date[date] on the X axis and dim_variant[variant_name] in the legend to get
+// one line per variant that settles as data accumulates. ALL(dim_date) clears the
+// single-day filter the axis applies, then keeps every day up to that date.
+Daily Cumulative Conversion by Variant =
+VAR _lastDay = MAX ( dim_date[date] )
+RETURN
+    CALCULATE (
+        [Conversion Rate],
+        FILTER ( ALL ( dim_date ), dim_date[date] <= _lastDay )
+    )
+
+
+// ------------------------------------------------ statistical test results
+// These read fct_test_results. In a visual with fct_test_results[metric] on an
+// axis, each row shows its own metric. Elsewhere they default to the primary
+// metric, conversion_rate.
+
+// Test Relative Lift: relative lift for the metric in context. Format: Percentage, 1 decimal.
+Test Relative Lift =
+VAR _metric = SELECTEDVALUE ( fct_test_results[metric], "conversion_rate" )
+RETURN
+    CALCULATE ( MAX ( fct_test_results[relative_lift] ), fct_test_results[metric] = _metric )
+
+// Test CI Low (Relative): lower end of the 95% confidence interval, as a relative
+// lift. Used as the lower error bar. Format: Percentage, 1 decimal.
+Test CI Low (Relative) =
+VAR _metric = SELECTEDVALUE ( fct_test_results[metric], "conversion_rate" )
+RETURN
+    CALCULATE (
+        DIVIDE ( MAX ( fct_test_results[ci_low] ), MAX ( fct_test_results[control_value] ) ),
+        fct_test_results[metric] = _metric
+    )
+
+// Test CI High (Relative): upper end of the 95% confidence interval, as a relative
+// lift. Used as the upper error bar. Format: Percentage, 1 decimal.
+Test CI High (Relative) =
+VAR _metric = SELECTEDVALUE ( fct_test_results[metric], "conversion_rate" )
+RETURN
+    CALCULATE (
+        DIVIDE ( MAX ( fct_test_results[ci_high] ), MAX ( fct_test_results[control_value] ) ),
+        fct_test_results[metric] = _metric
+    )
+
+// Test P Value: probability of a gap this large if the change did nothing.
+// Format: Decimal number, 4 decimals.
+Test P Value =
+VAR _metric = SELECTEDVALUE ( fct_test_results[metric], "conversion_rate" )
+RETURN
+    CALCULATE ( MAX ( fct_test_results[p_value] ), fct_test_results[metric] = _metric )
+
+// Decision Label: one-line verdict for the primary metric, written in Python by the
+// pre-registered decision rules, e.g. "SHIP: +11.4% conversion (95% CI +6.0% to +16.8%)".
+Decision Label =
+VAR _row = FILTER ( fct_test_results, fct_test_results[metric] = "conversion_rate" )
+VAR _decision = MAXX ( _row, fct_test_results[decision] )
+VAR _control = MAXX ( _row, fct_test_results[control_value] )
+VAR _lift = MAXX ( _row, fct_test_results[relative_lift] )
+VAR _low = DIVIDE ( MAXX ( _row, fct_test_results[ci_low] ), _control )
+VAR _high = DIVIDE ( MAXX ( _row, fct_test_results[ci_high] ), _control )
+RETURN
+    UPPER ( _decision ) & ": "
+        & FORMAT ( _lift, "+0.0%;-0.0%" ) & " conversion (95% CI "
+        & FORMAT ( _low, "+0.0%;-0.0%" ) & " to "
+        & FORMAT ( _high, "+0.0%;-0.0%" ) & ")"
+
+// Decision Color: background colour for the decision card (Format > Callout value
+// or Background > fx > Field value). Green to ship, amber to wait, red to stop.
+Decision Color =
+SWITCH (
+    MAXX ( FILTER ( fct_test_results, fct_test_results[metric] = "conversion_rate" ), fct_test_results[decision] ),
+    "Ship", "#1BAF7A",
+    "Inconclusive", "#EDA100",
+    "Not practically significant", "#EDA100",
+    "#E34948"
+)
+
+// SRM Status: whether the traffic split passed the sample ratio mismatch check.
+// If it failed, no other number on the report should be trusted.
+SRM Status =
+IF (
+    COUNTROWS ( FILTER ( fct_test_results, fct_test_results[srm_passed] = FALSE () ) ) = 0,
+    "SRM check passed",
+    "SRM detected: do not trust results"
+)
+
+// SRM Color: font or background colour for the SRM card.
+SRM Color =
+IF ( [SRM Status] = "SRM check passed", "#1BAF7A", "#E34948" )
